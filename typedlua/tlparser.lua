@@ -16,7 +16,32 @@ local function chainl1 (pat, sep)
   return lpeg.Cf(pat * lpeg.Cg(sep * pat)^0, tlast.exprBinaryOp)
 end
 
-local G = lpeg.P { "TypedLua";
+-- for relaxed processing
+
+local function update_warnings (s, i, t, m)
+  table.insert(t.warnings, "assuming " .. m .. " at " .. tostring(i))
+  return true
+end
+
+local function recover (p, msg)
+  return p + lpeg.Cmt(lpeg.Carg(1) * lpeg.Cc(msg), update_warnings)
+end
+
+local function update_unknown (s, i, t, m)
+  table.insert(t.unknown, i)
+  return true, tlast.unknown(i, m)
+end
+
+local function unknown (p)
+  return p + lpeg.Cmt(lpeg.Carg(1) * lpeg.C(lpeg.P(1)), update_unknown)
+end
+
+local function nop (p) return p end
+
+local G = function(relaxed)
+  local unknown = relaxed and unknown or nop
+  local recover = relaxed and recover or nop
+  return lpeg.P { "TypedLua";
   TypedLua = tllexer.Shebang^-1 * tllexer.Skip * lpeg.V("Chunk") * -1 +
              tllexer.report_error();
   -- type language
@@ -96,14 +121,14 @@ local G = lpeg.P { "TypedLua";
               tlast.statInterface;
   -- parser
   Chunk = lpeg.V("Block");
-  StatList = (tllexer.symb(";") + lpeg.V("Stat"))^0;
+  StatList = (tllexer.symb(";") + unknown(lpeg.V("Stat")))^0;
   Var = lpeg.V("Id");
   TypedId = lpeg.Cp() * tllexer.token(tllexer.Name, "Name") * (tllexer.symb(":") *
             lpeg.V("Type"))^-1 / tlast.ident;
   FunctionDef = tllexer.kw("function") * lpeg.V("FuncBody");
   FieldSep = tllexer.symb(",") + tllexer.symb(";");
   Field = lpeg.Cp() *
-          ((tllexer.symb("[") * lpeg.V("Expr") * tllexer.symb("]")) +
+          ((tllexer.symb("[") * lpeg.V("Expr") * recover(tllexer.symb("]"), "closing ]")) +
           (lpeg.Cp() * tllexer.token(tllexer.Name, "Name") / tlast.exprString)) *
           tllexer.symb("=") * lpeg.V("Expr") / tlast.fieldPair +
           lpeg.V("Expr");
@@ -111,7 +136,7 @@ local G = lpeg.P { "TypedLua";
            lpeg.V("Field");
   FieldList = (lpeg.V("TField") * (lpeg.V("FieldSep") * lpeg.V("TField"))^0 *
               lpeg.V("FieldSep")^-1)^-1;
-  Constructor = lpeg.Cp() * tllexer.symb("{") * lpeg.V("FieldList") * tllexer.symb("}") / tlast.exprTable;
+  Constructor = lpeg.Cp() * tllexer.symb("{") * lpeg.V("FieldList") * recover(tllexer.symb("}"), "closing }") / tlast.exprTable;
   NameList = lpeg.Cp() * lpeg.V("TypedId") * (tllexer.symb(",") * lpeg.V("TypedId"))^0 /
              tlast.namelist;
   ExpList = lpeg.Cp() * lpeg.V("Expr") * (tllexer.symb(",") * lpeg.V("Expr"))^0 /
@@ -165,22 +190,22 @@ local G = lpeg.P { "TypedLua";
                 (lpeg.Cp() * tllexer.symb(".") *
                   (lpeg.Cp() * tllexer.token(tllexer.Name, "Name") / tlast.exprString)) /
                   tlast.exprIndex +
-                (lpeg.Cp() * tllexer.symb("[") * lpeg.V("Expr") * tllexer.symb("]")) /
+                (lpeg.Cp() * tllexer.symb("[") * lpeg.V("Expr") * recover(tllexer.symb("]"), "closing ]")) /
                 tlast.exprIndex +
                 (lpeg.Cp() * lpeg.Cg(tllexer.symb(":") *
                    (lpeg.Cp() * tllexer.token(tllexer.Name, "Name") / tlast.exprString) *
                    lpeg.V("FuncArgs"))) / tlast.invoke +
                 (lpeg.Cp() * lpeg.V("FuncArgs")) / tlast.call)^0, tlast.exprSuffixed);
   PrimaryExp = lpeg.V("Var") +
-               lpeg.Cp() * tllexer.symb("(") * lpeg.V("Expr") * tllexer.symb(")") / tlast.exprParen;
+               lpeg.Cp() * tllexer.symb("(") * lpeg.V("Expr") * recover(tllexer.symb(")"), "closing )") / tlast.exprParen;
   Block = lpeg.Cp() * lpeg.V("StatList") * lpeg.V("RetStat")^-1 / tlast.block;
   IfStat = lpeg.Cp() * tllexer.kw("if") * lpeg.V("Expr") * tllexer.kw("then") * lpeg.V("Block") *
            (tllexer.kw("elseif") * lpeg.V("Expr") * tllexer.kw("then") * lpeg.V("Block"))^0 *
            (tllexer.kw("else") * lpeg.V("Block"))^-1 *
-           tllexer.kw("end") / tlast.statIf;
+           recover(tllexer.kw("end"), "if end") / tlast.statIf;
   WhileStat = lpeg.Cp() * tllexer.kw("while") * lpeg.V("Expr") *
-              tllexer.kw("do") * lpeg.V("Block") * tllexer.kw("end") / tlast.statWhile;
-  DoStat = tllexer.kw("do") * lpeg.V("Block") * tllexer.kw("end") / tlast.statDo;
+              tllexer.kw("do") * lpeg.V("Block") * recover(tllexer.kw("end"), "while end") / tlast.statWhile;
+  DoStat = tllexer.kw("do") * lpeg.V("Block") * recover(tllexer.kw("end"), "do end") / tlast.statDo;
   ForBody = tllexer.kw("do") * lpeg.V("Block");
   ForNum = lpeg.Cp() *
            lpeg.V("Id") * tllexer.symb("=") * lpeg.V("Expr") * tllexer.symb(",") *
@@ -234,7 +259,7 @@ local G = lpeg.P { "TypedLua";
          lpeg.V("RepeatStat") + lpeg.V("FuncStat") + lpeg.V("LocalStat") +
          lpeg.V("LabelStat") + lpeg.V("BreakStat") + lpeg.V("GoToStat") +
          lpeg.V("TypeDecStat") + lpeg.V("ExprStat");
-}
+} end
 
 local traverse_stm, traverse_exp, traverse_var
 local traverse_block, traverse_explist, traverse_varlist, traverse_parlist
@@ -585,6 +610,8 @@ function traverse_stm (env, stm)
     return traverse_invoke(env, stm)
   elseif tag == "Interface" then
     return traverse_interface(env, stm)
+  elseif tag == "Unknown" then
+    return true
   else
     error("trying to traverse a statement, but got a " .. tag)
   end
@@ -632,13 +659,13 @@ local function traverse (ast, errorinfo, strict)
   tlst.end_function(env)
   status, msg = verify_pending_gotos(env)
   if not status then return status, msg end
-  return ast
+  return ast, errorinfo
 end
 
-function tlparser.parse (subject, filename, strict)
-  local errorinfo = { subject = subject, filename = filename }
+function tlparser.parse (subject, filename, strict, relaxed)
+  local errorinfo = { subject = subject, filename = filename, warnings = {}, unknown = {} }
   lpeg.setmaxstack(1000)
-  local ast, error_msg = lpeg.match(G, subject, nil, errorinfo, strict)
+  local ast, error_msg = lpeg.match(G(relaxed), subject, nil, errorinfo, strict)
   if not ast then return ast, error_msg end
   return traverse(ast, errorinfo, strict)
 end

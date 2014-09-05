@@ -72,6 +72,7 @@ local Keywords = lpeg.P("and") + "break" + "do" + "elseif" + "else" + "end" +
                  "local" + "nil" + "not" + "or" + "repeat" + "return" +
                  "then" + "true" + "until" + "while"
 
+tllexer.Keywords = Keywords
 tllexer.Reserved = Keywords * -idRest
 
 local Identifier = idStart * idRest^0
