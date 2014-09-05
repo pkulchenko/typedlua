@@ -33,7 +33,18 @@ local function update_unknown (s, i, t, m)
 end
 
 local function unknown (p)
-  return p + lpeg.Cmt(lpeg.Carg(1) * lpeg.C(lpeg.P(1)), update_unknown)
+  local level = 0
+  local enter = lpeg.Cmt(lpeg.P(true), function(s, p) level = level + 1 return p end)
+  local leave = lpeg.Cmt(lpeg.P(true), function(s, p) level = level - 1 return p end)
+    * (lpeg.P(1) - lpeg.P(1))
+  return lpeg.Cmt(enter * p
+    + lpeg.Cmt(lpeg.Carg(1) * lpeg.C(lpeg.P(1)), function(s,i,t,m)
+          if level == 1 or not lpeg.match(tllexer.Keywords,s,i-1)
+          then return update_unknown(s,i,t,m)
+          else return false
+          end
+        end)
+    + leave, function(s, p, ...) level = level - 1 return p, ... end)
 end
 
 local function nop (p) return p end
@@ -662,10 +673,13 @@ local function traverse (ast, errorinfo, strict)
   return ast, errorinfo
 end
 
+local grammar = {}
 function tlparser.parse (subject, filename, strict, relaxed)
   local errorinfo = { subject = subject, filename = filename, warnings = {}, unknown = {} }
   lpeg.setmaxstack(1000)
-  local ast, error_msg = lpeg.match(G(relaxed), subject, nil, errorinfo, strict)
+  relaxed = relaxed or false
+  grammar[relaxed] = grammar[relaxed] or G(relaxed)
+  local ast, error_msg = lpeg.match(grammar[relaxed], subject, nil, errorinfo, strict)
   if not ast then return ast, error_msg end
   return traverse(ast, errorinfo, strict)
 end
