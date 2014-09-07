@@ -18,18 +18,20 @@ end
 
 -- for relaxed processing
 
-local function update_warnings (s, i, t, m)
-  table.insert(t.warnings, "assuming " .. m .. " at " .. tostring(i))
-  return true
+local function update_warnings (m)
+  return lpeg.Cmt(lpeg.Carg(1) * lpeg.Carg(3),
+  function (s, i, e, r)
+    if not r then
+      return false
+    else
+      table.insert(e.warnings, "assuming " .. m .. " at " .. tostring(i))
+      return true
+    end
+  end)
 end
 
 local function recover (p, msg)
-  return p + lpeg.Cmt(lpeg.Carg(1) * lpeg.Cc(msg), update_warnings)
-end
-
-local function update_unknown (s, i, t, m)
-  table.insert(t.unknown, i)
-  return true, tlast.unknown(i, m)
+  return p + update_warnings(msg)
 end
 
 local function unknown (p)
@@ -38,21 +40,16 @@ local function unknown (p)
   local leave = lpeg.Cmt(lpeg.P(true), function(s, p) level = level - 1 return p end)
     * (lpeg.P(1) - lpeg.P(1))
   return lpeg.Cmt(enter * p
-    + lpeg.Cmt(lpeg.Carg(1) * lpeg.C(lpeg.P(1)), function(s,i,t,m)
-          if level == 1 or not lpeg.match(tllexer.Keywords,s,i-1)
-          then return update_unknown(s,i,t,m)
-          else return false
-          end
+    + lpeg.Cmt(lpeg.Carg(1) * lpeg.Carg(3) * lpeg.C(lpeg.P(1)), function(s,i,t,r,m)
+          if not r
+          or level ~= 1 and lpeg.match(tllexer.Keywords,s,i-1) then return false end
+          table.insert(t.unknown, i)
+          return true, tlast.unknown(i, m)
         end)
     + leave, function(s, p, ...) level = level - 1 return p, ... end)
 end
 
-local function nop (p) return p end
-
-local G = function(relaxed)
-  local unknown = relaxed and unknown or nop
-  local recover = relaxed and recover or nop
-  return lpeg.P { "TypedLua";
+local G = lpeg.P { "TypedLua";
   TypedLua = tllexer.Shebang^-1 * tllexer.Skip * lpeg.V("Chunk") * -1 +
              tllexer.report_error();
   -- type language
@@ -270,7 +267,7 @@ local G = function(relaxed)
          lpeg.V("RepeatStat") + lpeg.V("FuncStat") + lpeg.V("LocalStat") +
          lpeg.V("LabelStat") + lpeg.V("BreakStat") + lpeg.V("GoToStat") +
          lpeg.V("TypeDecStat") + lpeg.V("ExprStat");
-} end
+}
 
 local traverse_stm, traverse_exp, traverse_var
 local traverse_block, traverse_explist, traverse_varlist, traverse_parlist
@@ -673,13 +670,10 @@ local function traverse (ast, errorinfo, strict)
   return ast, errorinfo
 end
 
-local grammar = {}
 function tlparser.parse (subject, filename, strict, relaxed)
   local errorinfo = { subject = subject, filename = filename, warnings = {}, unknown = {} }
   lpeg.setmaxstack(1000)
-  relaxed = relaxed or false
-  grammar[relaxed] = grammar[relaxed] or G(relaxed)
-  local ast, error_msg = lpeg.match(grammar[relaxed], subject, nil, errorinfo, strict)
+  local ast, error_msg = lpeg.match(G, subject, nil, errorinfo, strict, relaxed or false)
   if not ast then return ast, error_msg end
   return traverse(ast, errorinfo, strict)
 end
