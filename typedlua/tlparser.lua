@@ -18,20 +18,15 @@ end
 
 -- for relaxed processing
 
-local function update_warnings (m)
-  return lpeg.Cmt(lpeg.Carg(1) * lpeg.Carg(3),
-  function (s, i, e, r)
+local function recover (p, msg)
+  return p + lpeg.Cmt(lpeg.Carg(1) * lpeg.Carg(3), function (s, i, e, r)
     if not r then
       return false
     else
-      table.insert(e.warnings, "assuming " .. m .. " at " .. tostring(i))
+      e.warnings[i] = msg
       return true
     end
   end)
-end
-
-local function recover (p, msg)
-  return p + update_warnings(msg)
 end
 
 local function unknown (p)
