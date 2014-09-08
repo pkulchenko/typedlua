@@ -151,7 +151,7 @@ local G = lpeg.P { "TypedLua";
             tlast.explist;
   FuncArgs = tllexer.symb("(") *
              (lpeg.V("Expr") * (tllexer.symb(",") * lpeg.V("Expr"))^0)^-1 *
-             tllexer.symb(")") +
+             recover(tllexer.symb(")"), "closing )") +
              lpeg.V("Constructor") +
              lpeg.Cp() * tllexer.token(tllexer.String, "String") / tlast.exprString;
   OrOp = tllexer.kw("or") / "or";
@@ -236,9 +236,9 @@ local G = lpeg.P { "TypedLua";
             lpeg.Cp() / tlast.parList0;
   TypedVarArg = lpeg.Cp() * tllexer.symb("...") * (tllexer.symb(":") * lpeg.V("Type"))^-1 /
                 tlast.identDots;
-  FuncBody = lpeg.Cp() * tllexer.symb("(") * lpeg.V("ParList") * tllexer.symb(")") *
+  FuncBody = lpeg.Cp() * tllexer.symb("(") * lpeg.V("ParList") * recover(tllexer.symb(")"), "closing )") *
              (tllexer.symb(":") * lpeg.V("RetType"))^-1 *
-             lpeg.V("Block") * tllexer.kw("end") / tlast.exprFunction;
+             lpeg.V("Block") * recover(tllexer.kw("end"), "function end") / tlast.exprFunction;
   FuncStat = lpeg.Cp() * (tllexer.kw("const") * lpeg.Cc(true) + lpeg.Cc(false)) *
              tllexer.kw("function") * lpeg.V("FuncName") * lpeg.V("FuncBody") /
              tlast.statFuncSet;
