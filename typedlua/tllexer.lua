@@ -83,12 +83,21 @@ function tllexer.token (pat, name)
   return pat * tllexer.Skip + updateffp(name) * lpeg.P(false)
 end
 
+-- token that doesn't accept comments after it
+function tllexer.nctoken (pat, name)
+  return pat * Space^0 + updateffp(name) * lpeg.P(false)
+end
+
 function tllexer.symb (str)
   return tllexer.token(lpeg.P(str), str)
 end
 
 function tllexer.kw (str)
   return tllexer.token(lpeg.P(str) * -idRest, str)
+end
+
+function tllexer.lcwrap (pat)
+  return (pat + (lpeg.P("--") * Open * (pat - CloseEQ) * Space^0 * Close) + Comment) * tllexer.Skip
 end
 
 local Hex = (lpeg.P("0x") + lpeg.P("0X")) * lpeg.xdigit^1

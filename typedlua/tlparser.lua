@@ -126,7 +126,7 @@ local G = lpeg.P { "TypedLua";
   Chunk = lpeg.V("Block");
   StatList = (tllexer.symb(";") + unknown(lpeg.V("Stat")))^0;
   Var = lpeg.V("Id");
-  TypedId = lpeg.Cp() * tllexer.token(tllexer.Name, "Name") * (tllexer.symb(":") *
+  TypedId = lpeg.Cp() * tllexer.nctoken(tllexer.Name, "Name") * tllexer.lcwrap(tllexer.symb(":") *
             lpeg.V("Type"))^-1 / tlast.ident;
   FunctionDef = tllexer.kw("function") * lpeg.V("FuncBody");
   FieldSep = tllexer.symb(",") + tllexer.symb(";");
