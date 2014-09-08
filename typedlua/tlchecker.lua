@@ -1351,6 +1351,8 @@ function check_stm (env, stm)
     check_invoke(env, stm)
   elseif tag == "Interface" then
     check_interface(env, stm)
+  elseif tag == "Unknown" then
+    return true
   else
     error("cannot type check statement " .. tag)
   end
