@@ -19,20 +19,16 @@ end
 -- for relaxed processing
 
 local function recover (p, msg)
-  return p + lpeg.Cmt(lpeg.Carg(1) * lpeg.Carg(3), function (s, i, e, r)
-    if not r then
-      return false
-    else
-      e.warnings[i] = msg
-      return true
-    end
+  return p + lpeg.Cmt(lpeg.Carg(1) * lpeg.Carg(3), function (s, i, e, recover)
+    if recover then e.warnings[i] = msg end
+    return recover
   end)
 end
 
 local function unknown (p)
   local level = 0
-  local enter = lpeg.Cmt(lpeg.P(true), function(s, p) level = level + 1 return p end)
-  local leave = lpeg.Cmt(lpeg.P(true), function(s, p) level = level - 1 return p end)
+  local enter = lpeg.Cmt(lpeg.P(true), function() level = level + 1 return true end)
+  local leave = lpeg.Cmt(lpeg.P(true), function() level = level - 1 return true end)
     * (lpeg.P(1) - lpeg.P(1))
   return lpeg.Cmt(enter * p
     + lpeg.Cmt(lpeg.Carg(1) * lpeg.Carg(3) * lpeg.C(lpeg.P(1)), function(s,i,t,r,m)
