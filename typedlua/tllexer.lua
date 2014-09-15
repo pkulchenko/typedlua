@@ -58,11 +58,11 @@ local CloseEQ = lpeg.Cmt(Close * lpeg.Cb("init"),
 local LongString = Open * lpeg.C((lpeg.P(1) - CloseEQ)^0) * Close /
                    function (s, o) return s end
 
-local Comment = lpeg.P("--") * LongString /
-                function () return end +
-                lpeg.P("--") * (lpeg.P(1) - lpeg.P("\n"))^0
+local LongComment = lpeg.P("--") * LongString / function () return end
+local LineComment = lpeg.P("--") * (lpeg.P(1) - lpeg.P("\n"))^0 - LongComment
 
-tllexer.Skip = (Space + Comment)^0
+tllexer.Comment = (LongComment + LineComment) * Space^0
+tllexer.Skip = (Space + LineComment)^0
 
 local idStart = lpeg.alpha + lpeg.P("_")
 local idRest = lpeg.alnum + lpeg.P("_")
@@ -79,25 +79,24 @@ local Identifier = idStart * idRest^0
 
 tllexer.Name = -tllexer.Reserved * lpeg.C(Identifier) * -idRest
 
-function tllexer.token (pat, name)
-  return pat * tllexer.Skip + updateffp(name) * lpeg.P(false)
+tllexer.leavecomment = true
+
+function tllexer.token (pat, name, leavecomment)
+  return (leavecomment and lpeg.P(true) or (Space + LongComment)^0) * pat * tllexer.Skip
+    + updateffp(name) * lpeg.P(false)
 end
 
--- token that doesn't accept comments after it
-function tllexer.nctoken (pat, name)
-  return pat * Space^0 + updateffp(name) * lpeg.P(false)
+function tllexer.symb (str, leavecomment)
+  return tllexer.token(lpeg.P(str), str, leavecomment)
 end
 
-function tllexer.symb (str)
-  return tllexer.token(lpeg.P(str), str)
-end
-
-function tllexer.kw (str)
-  return tllexer.token(lpeg.P(str) * -idRest, str)
+function tllexer.kw (str, leavecomment)
+  return tllexer.token(lpeg.P(str) * -idRest, str, leavecomment)
 end
 
 function tllexer.lcwrap (pat)
-  return (pat + (lpeg.P("--") * Open * (pat - CloseEQ) * Space^0 * Close) + Comment) * tllexer.Skip
+  return (lpeg.P("--") * Open * Space^0 * (pat - CloseEQ) * Space^0 * (Close / function() return end)
+         + LongComment^0 * pat) * tllexer.Skip
 end
 
 local Hex = (lpeg.P("0x") + lpeg.P("0X")) * lpeg.xdigit^1

@@ -95,6 +95,11 @@ function tlast.unknown (pos, s)
   return { tag = "Unknown", pos = pos, s }
 end
 
+-- comment : (pos, string)
+function tlast.comment (pos, s)
+  return { tag = "Comment", pos = pos, s }
+end
+
 -- block : (number, stat*) -> (block)
 function tlast.block (pos, ...)
   return { tag = "Block", pos = pos, ... }
@@ -754,6 +759,10 @@ function stm2str (stm)
     str = str .. type2str(stm[2])
     str = str .. " }"
   elseif tag == "Unknown" then
+    str = str .. "{ "
+    str = str .. '"' .. tostring(stm[1]) .. '"'
+    str = str .. " }"
+  elseif tag == "Comment" then
     str = str .. "{ "
     str = str .. '"' .. tostring(stm[1]) .. '"'
     str = str .. " }"

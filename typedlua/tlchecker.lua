@@ -1353,6 +1353,8 @@ function check_stm (env, stm)
     check_interface(env, stm)
   elseif tag == "Unknown" then
     return true
+  elseif tag == "Comment" then
+    return true
   else
     error("cannot type check statement " .. tag)
   end

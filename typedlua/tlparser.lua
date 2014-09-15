@@ -122,7 +122,7 @@ local G = lpeg.P { "TypedLua";
   Chunk = lpeg.V("Block");
   StatList = (tllexer.symb(";") + unknown(lpeg.V("Stat")))^0;
   Var = lpeg.V("Id");
-  TypedId = lpeg.Cp() * tllexer.nctoken(tllexer.Name, "Name") * tllexer.lcwrap(tllexer.symb(":") *
+  TypedId = lpeg.Cp() * tllexer.token(tllexer.Name, "Name") * tllexer.lcwrap(tllexer.symb(":", tllexer.leavecomment) *
             lpeg.V("Type"))^-1 / tlast.ident;
   FunctionDef = tllexer.kw("function") * lpeg.V("FuncBody");
   FieldSep = tllexer.symb(",") + tllexer.symb(";");
@@ -246,6 +246,7 @@ local G = lpeg.P { "TypedLua";
             (lpeg.V("Expr") * (tllexer.symb(",") * lpeg.V("Expr"))^0)^-1 *
             tllexer.symb(";")^-1 / tlast.statReturn;
   TypeDecStat = lpeg.V("Interface");
+  CommentStat = lpeg.Cp() * lpeg.C(tllexer.Comment) / tlast.comment;
   LocalTypeDec = lpeg.V("TypeDecStat") / tlast.statLocalTypeDec;
   LVar = (tllexer.kw("const") * lpeg.V("SuffixedExp") / tlast.setConst) +
          lpeg.V("SuffixedExp");
@@ -257,7 +258,7 @@ local G = lpeg.P { "TypedLua";
   Stat = lpeg.V("IfStat") + lpeg.V("WhileStat") + lpeg.V("DoStat") + lpeg.V("ForStat") +
          lpeg.V("RepeatStat") + lpeg.V("FuncStat") + lpeg.V("LocalStat") +
          lpeg.V("LabelStat") + lpeg.V("BreakStat") + lpeg.V("GoToStat") +
-         lpeg.V("TypeDecStat") + lpeg.V("ExprStat");
+         lpeg.V("TypeDecStat") + lpeg.V("ExprStat") + lpeg.V("CommentStat");
 }
 
 local traverse_stm, traverse_exp, traverse_var
@@ -610,6 +611,8 @@ function traverse_stm (env, stm)
   elseif tag == "Interface" then
     return traverse_interface(env, stm)
   elseif tag == "Unknown" then
+    return true
+  elseif tag == "Comment" then
     return true
   else
     error("trying to traverse a statement, but got a " .. tag)
