@@ -228,7 +228,7 @@ local G = lpeg.P { "TypedLua";
   TypedVarArg = lpeg.Cp() * tllexer.symb("...") * (tllexer.symb(":") * lpeg.V("Type"))^-1 /
                 tlast.identDots;
   FuncBody = lpeg.Cp() * tllexer.symb("(") * lpeg.V("ParList") * recover(tllexer.symb(")"), "closing )") *
-             (tllexer.symb(":") * lpeg.V("RetType"))^-1 *
+             tllexer.lcwrap(tllexer.symb(":", tllexer.leavecomment) * lpeg.V("RetType"))^-1 *
              lpeg.V("Block") * recover(tllexer.kw("end"), "function end") / tlast.exprFunction;
   FuncStat = lpeg.Cp() * (tllexer.kw("const") * lpeg.Cc(true) + lpeg.Cc(false)) *
              tllexer.kw("function") * lpeg.V("FuncName") * lpeg.V("FuncBody") /
