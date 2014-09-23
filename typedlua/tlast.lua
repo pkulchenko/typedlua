@@ -763,9 +763,7 @@ function stm2str (stm)
     str = str .. '"' .. tostring(stm[1]) .. '"'
     str = str .. " }"
   elseif tag == "Comment" then
-    str = str .. "{ "
-    str = str .. '"' .. tostring(stm[1]) .. '"'
-    str = str .. " }"
+    str = nil
   else
     error("expecting a statement, but got a " .. tag)
   end
@@ -775,7 +773,8 @@ end
 function block2str (block)
   local l = {}
   for k, v in ipairs(block) do
-    l[k] = stm2str(v)
+    local val = stm2str(v)
+    if val then table.insert(l, val) end
   end
   return "{ " .. table.concat(l, ", ") .. " }"
 end
