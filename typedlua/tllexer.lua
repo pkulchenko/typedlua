@@ -94,9 +94,9 @@ function tllexer.kw (str, leavecomment)
   return tllexer.token(lpeg.P(str) * -idRest, str, leavecomment)
 end
 
-function tllexer.lcwrap (pat)
+function tllexer.lcwrap (pat, leavecomment)
   return (lpeg.P("--") * Open * Space^0 * (pat - CloseEQ) * Space^0 * (Close / function() return end)
-         + LongComment^0 * pat) * tllexer.Skip
+         + (leavecomment and lpeg.P(true) or LongComment^0) * pat) * tllexer.Skip
 end
 
 local Hex = (lpeg.P("0x") + lpeg.P("0X")) * lpeg.xdigit^1

@@ -198,13 +198,13 @@ local G = lpeg.P { "TypedLua";
   PrimaryExp = lpeg.V("Var") +
                lpeg.Cp() * tllexer.symb("(") * lpeg.V("Expr") * recover(tllexer.symb(")"), "closing )") / tlast.exprParen;
   Block = lpeg.Cp() * lpeg.V("StatList") * lpeg.V("RetStat")^-1 / tlast.block;
-  IfStat = lpeg.Cp() * tllexer.kw("if") * lpeg.V("Expr") * tllexer.kw("then") * lpeg.V("Block") *
+  IfStat = lpeg.Cp() * tllexer.kw("if", tllexer.leavecomment) * lpeg.V("Expr") * tllexer.kw("then") * lpeg.V("Block") *
            (tllexer.kw("elseif") * lpeg.V("Expr") * tllexer.kw("then") * lpeg.V("Block"))^0 *
            (tllexer.kw("else") * lpeg.V("Block"))^-1 *
            recover(tllexer.kw("end"), "if end") / tlast.statIf;
-  WhileStat = lpeg.Cp() * tllexer.kw("while") * lpeg.V("Expr") *
+  WhileStat = lpeg.Cp() * tllexer.kw("while", tllexer.leavecomment) * lpeg.V("Expr") *
               tllexer.kw("do") * lpeg.V("Block") * recover(tllexer.kw("end"), "while end") / tlast.statWhile;
-  DoStat = tllexer.kw("do") * lpeg.V("Block") * recover(tllexer.kw("end"), "do end") / tlast.statDo;
+  DoStat = tllexer.kw("do", tllexer.leavecomment) * lpeg.V("Block") * recover(tllexer.kw("end"), "do end") / tlast.statDo;
   ForBody = tllexer.kw("do") * lpeg.V("Block");
   ForNum = lpeg.Cp() *
            lpeg.V("Id") * tllexer.symb("=") * lpeg.V("Expr") * tllexer.symb(",") *
@@ -212,8 +212,8 @@ local G = lpeg.P { "TypedLua";
            lpeg.V("ForBody") / tlast.statFornum;
   ForGen = lpeg.Cp() * lpeg.V("NameList") * tllexer.kw("in") *
            lpeg.V("ExpList") * lpeg.V("ForBody") / tlast.statForin;
-  ForStat = tllexer.kw("for") * (lpeg.V("ForNum") + lpeg.V("ForGen")) * tllexer.kw("end");
-  RepeatStat = lpeg.Cp() * tllexer.kw("repeat") * lpeg.V("Block") *
+  ForStat = tllexer.kw("for", tllexer.leavecomment) * (lpeg.V("ForNum") + lpeg.V("ForGen")) * tllexer.kw("end");
+  RepeatStat = lpeg.Cp() * tllexer.kw("repeat", tllexer.leavecomment) * lpeg.V("Block") *
                tllexer.kw("until") * lpeg.V("Expr") / tlast.statRepeat;
   FuncName = lpeg.Cf(lpeg.V("Id") * (tllexer.symb(".") *
              (lpeg.Cp() * tllexer.token(tllexer.Name, "Name") / tlast.exprString))^0, tlast.funcName) *
@@ -230,22 +230,22 @@ local G = lpeg.P { "TypedLua";
   FuncBody = lpeg.Cp() * tllexer.symb("(") * lpeg.V("ParList") * recover(tllexer.symb(")"), "closing )") *
              tllexer.lcwrap(tllexer.symb(":", tllexer.leavecomment) * lpeg.V("RetType"))^-1 *
              lpeg.V("Block") * recover(tllexer.kw("end"), "function end") / tlast.exprFunction;
-  FuncStat = lpeg.Cp() * (tllexer.kw("const") * lpeg.Cc(true) + lpeg.Cc(false)) *
-             tllexer.kw("function") * lpeg.V("FuncName") * lpeg.V("FuncBody") /
+  FuncStat = lpeg.Cp() * tllexer.lcwrap(tllexer.kw("const", tllexer.leavecomment) * lpeg.Cc(true) + lpeg.Cc(false), tllexer.leavecomment) *
+             tllexer.kw("function", tllexer.leavecomment) * lpeg.V("FuncName") * lpeg.V("FuncBody") /
              tlast.statFuncSet;
   LocalFunc = lpeg.Cp() * tllexer.kw("function") *
               lpeg.V("Id") * lpeg.V("FuncBody") / tlast.statLocalrec;
   LocalAssign = lpeg.Cp() * lpeg.V("NameList") *
                 ((tllexer.symb("=") * lpeg.V("ExpList")) + lpeg.Ct(lpeg.Cc())) / tlast.statLocal;
-  LocalStat = tllexer.kw("local") *
-              (lpeg.V("LocalTypeDec") + lpeg.V("LocalFunc") + lpeg.V("LocalAssign"));
-  LabelStat = lpeg.Cp() * tllexer.symb("::") * tllexer.token(tllexer.Name, "Name") * tllexer.symb("::") / tlast.statLabel;
-  BreakStat = lpeg.Cp() * tllexer.kw("break") / tlast.statBreak;
-  GoToStat = lpeg.Cp() * tllexer.kw("goto") * tllexer.token(tllexer.Name, "Name") / tlast.statGoto;
-  RetStat = lpeg.Cp() * tllexer.kw("return") *
+  LocalStat = tllexer.lcwrap(tllexer.kw("local", tllexer.leavecomment) * lpeg.V("LocalTypeDec"), tllexer.leavecomment) +
+              tllexer.kw("local", tllexer.leavecomment) * (lpeg.V("LocalFunc") + lpeg.V("LocalAssign"));
+  LabelStat = lpeg.Cp() * tllexer.symb("::", tllexer.leavecomment) * tllexer.token(tllexer.Name, "Name") * tllexer.symb("::") / tlast.statLabel;
+  BreakStat = lpeg.Cp() * tllexer.kw("break", tllexer.leavecomment) / tlast.statBreak;
+  GoToStat = lpeg.Cp() * tllexer.kw("goto", tllexer.leavecomment) * tllexer.token(tllexer.Name, "Name") / tlast.statGoto;
+  RetStat = lpeg.Cp() * tllexer.kw("return", tllexer.leavecomment) *
             (lpeg.V("Expr") * (tllexer.symb(",") * lpeg.V("Expr"))^0)^-1 *
             tllexer.symb(";")^-1 / tlast.statReturn;
-  TypeDecStat = lpeg.V("Interface");
+  TypeDecStat = tllexer.lcwrap(lpeg.V("Interface"), tllexer.leavecomment);
   CommentStat = lpeg.Cp() * lpeg.C(tllexer.Comment) / tlast.comment;
   LocalTypeDec = lpeg.V("TypeDecStat") / tlast.statLocalTypeDec;
   LVar = (tllexer.kw("const") * lpeg.V("SuffixedExp") / tlast.setConst) +
